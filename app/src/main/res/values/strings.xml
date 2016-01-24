@@ -11,6 +11,7 @@
     <string name="label_catalogues">Catalogues</string>
     <string name="label_categories">Categories</string>
     <string name="label_selected">Selected: %1$d</string>
+    <string name="label_backup">Backup</string>
 
     <!-- Actions -->
     <string name="action_settings">Settings</string>

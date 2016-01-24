@@ -38,7 +38,7 @@ public class Chapter implements Serializable {
     @StorIOSQLiteColumn(name = ChapterTable.COLUMN_CHAPTER_NUMBER)
     public float chapter_number;
 
-    public int status;
+    public transient int status;
 
     public Chapter() {}
 

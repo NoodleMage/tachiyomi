@@ -31,6 +31,7 @@ import eu.kanade.tachiyomi.data.database.models.MangaChapter;
 import eu.kanade.tachiyomi.data.database.models.MangaSQLiteTypeMapping;
 import eu.kanade.tachiyomi.data.database.models.MangaSync;
 import eu.kanade.tachiyomi.data.database.models.MangaSyncSQLiteTypeMapping;
+import eu.kanade.tachiyomi.data.database.resolvers.CategoriesForMangaGetResolver;
 import eu.kanade.tachiyomi.data.database.resolvers.LibraryMangaGetResolver;
 import eu.kanade.tachiyomi.data.database.resolvers.MangaChapterGetResolver;
 import eu.kanade.tachiyomi.data.database.tables.CategoryTable;
@@ -339,6 +340,15 @@ public class DatabaseHelper {
                 .withQuery(Query.builder()
                         .table(CategoryTable.TABLE)
                         .orderBy(CategoryTable.COLUMN_ORDER)
+                        .build())
+                .prepare();
+    }
+
+    public PreparedGetListOfObjects<Category> getCategoriesForManga(Manga manga) {
+        return db.get()
+                .listOfObjects(Category.class)
+                .withQuery(RawQuery.builder()
+                        .query(CategoriesForMangaGetResolver.getQuery(manga))
                         .build())
                 .prepare();
     }

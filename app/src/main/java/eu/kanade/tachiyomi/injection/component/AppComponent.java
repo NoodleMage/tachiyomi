@@ -12,6 +12,7 @@ import eu.kanade.tachiyomi.data.sync.LibraryUpdateService;
 import eu.kanade.tachiyomi.data.sync.UpdateMangaSyncService;
 import eu.kanade.tachiyomi.injection.module.AppModule;
 import eu.kanade.tachiyomi.injection.module.DataModule;
+import eu.kanade.tachiyomi.ui.backup.BackupPresenter;
 import eu.kanade.tachiyomi.ui.catalogue.CataloguePresenter;
 import eu.kanade.tachiyomi.ui.download.DownloadPresenter;
 import eu.kanade.tachiyomi.ui.library.LibraryPresenter;
@@ -46,6 +47,7 @@ public interface AppComponent {
     void inject(MyAnimeListPresenter myAnimeListPresenter);
     void inject(CategoryPresenter categoryPresenter);
     void inject(RecentChaptersPresenter recentChaptersPresenter);
+    void inject(BackupPresenter backupPresenter);
 
     void inject(ReaderActivity readerActivity);
     void inject(MangaActivity mangaActivity);

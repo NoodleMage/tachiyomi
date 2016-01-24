@@ -5,4 +5,5 @@
     <item name="nav_drawer_catalogues" type="id">nav_drawer_catalogues</item>
     <item name="nav_drawer_settings" type="id">nav_drawer_settings</item>
     <item name="nav_drawer_downloads" type="id">nav_drawer_downloads</item>
+    <item name="nav_drawer_backup" type="id">nav_drawer_backup</item>
 </resources>

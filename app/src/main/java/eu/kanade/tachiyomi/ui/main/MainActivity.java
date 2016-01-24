@@ -15,6 +15,7 @@ import com.mikepenz.materialdrawer.model.PrimaryDrawerItem;
 import butterknife.Bind;
 import butterknife.ButterKnife;
 import eu.kanade.tachiyomi.R;
+import eu.kanade.tachiyomi.ui.backup.BackupFragment;
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity;
 import eu.kanade.tachiyomi.ui.catalogue.CatalogueFragment;
 import eu.kanade.tachiyomi.ui.download.DownloadFragment;
@@ -84,7 +85,10 @@ public class MainActivity extends BaseActivity {
                         new PrimaryDrawerItem()
                                 .withName(R.string.label_settings)
                                 .withIdentifier(R.id.nav_drawer_settings)
-                                .withSelectable(false)
+                                .withSelectable(false),
+                        new PrimaryDrawerItem()
+                                .withName(R.string.label_backup)
+                                .withIdentifier(R.id.nav_drawer_backup)
                 )
                 .withSavedInstance(savedState)
                 .withOnDrawerItemClickListener(
@@ -107,6 +111,8 @@ public class MainActivity extends BaseActivity {
                                     case R.id.nav_drawer_settings:
                                         startActivity(new Intent(this, SettingsActivity.class));
                                         break;
+                                    case R.id.nav_drawer_backup:
+                                        setFragment(BackupFragment.newInstance());
                                 }
                             }
                             return false;
