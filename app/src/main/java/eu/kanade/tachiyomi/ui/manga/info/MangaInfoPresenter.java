@@ -152,7 +152,7 @@ public class MangaInfoPresenter extends BasePresenter<MangaInfoFragment> {
     public void editCoverWithLocalFile(File file, ImageView imageView) throws IOException {
         if (manga.favorite) {
             coverCache.copyToLocalCache(manga.thumbnail_url, file);
-            coverCache.loadFromCache(imageView, file);
+            coverCache.saveOrLoadFromCache(imageView, manga.thumbnail_url, source.getGlideHeaders());
         }
     }
 
