@@ -1,6 +1,11 @@
 package eu.kanade.tachiyomi.ui.manga.info;
 
+import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
+import android.support.design.widget.FloatingActionButton;
+import android.support.v4.content.ContextCompat;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -10,30 +15,38 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.bumptech.glide.load.model.LazyHeaders;
+import com.mikepenz.google_material_typeface_library.GoogleMaterial;
+import com.mikepenz.iconics.IconicsDrawable;
+
+import java.io.File;
+import java.io.IOException;
 
 import butterknife.Bind;
 import butterknife.ButterKnife;
 import eu.kanade.tachiyomi.R;
 import eu.kanade.tachiyomi.data.cache.CoverCache;
 import eu.kanade.tachiyomi.data.database.models.Manga;
+import eu.kanade.tachiyomi.data.io.IOHandler;
+import eu.kanade.tachiyomi.data.source.base.Source;
 import eu.kanade.tachiyomi.ui.base.fragment.BaseRxFragment;
+import eu.kanade.tachiyomi.util.ToastUtil;
 import nucleus.factory.RequiresPresenter;
 
 @RequiresPresenter(MangaInfoPresenter.class)
 public class MangaInfoFragment extends BaseRxFragment<MangaInfoPresenter> {
 
+    private static final int REQUEST_IMAGE_OPEN = 101;
     @Bind(R.id.swipe_refresh) SwipeRefreshLayout swipeRefresh;
-
     @Bind(R.id.manga_artist) TextView artist;
     @Bind(R.id.manga_author) TextView author;
     @Bind(R.id.manga_chapters) TextView chapterCount;
     @Bind(R.id.manga_genres) TextView genres;
     @Bind(R.id.manga_status) TextView status;
+    @Bind(R.id.manga_source) TextView source;
     @Bind(R.id.manga_summary) TextView description;
     @Bind(R.id.manga_cover) ImageView cover;
-
     @Bind(R.id.action_favorite) Button favoriteBtn;
-
+    @Bind(R.id.fab_edit) FloatingActionButton fabEdit;
 
     public static MangaInfoFragment newInstance() {
         return new MangaInfoFragment();
@@ -52,26 +65,47 @@ public class MangaInfoFragment extends BaseRxFragment<MangaInfoPresenter> {
         View view = inflater.inflate(R.layout.fragment_manga_info, container, false);
         ButterKnife.bind(this, view);
 
-        favoriteBtn.setOnClickListener(v -> {
-            getPresenter().toggleFavorite();
-        });
+        //Create edit drawable with size 24dp (google guidelines)
+        IconicsDrawable edit = new IconicsDrawable(this.getContext())
+                .icon(GoogleMaterial.Icon.gmd_edit)
+                .color(ContextCompat.getColor(this.getContext(), R.color.white))
+                .sizeDp(24);
+
+        // Update image of fab button
+        fabEdit.setImageDrawable(edit);
+
+        // Set listener.
+        fabEdit.setOnClickListener(v -> selectImage());
+
+        favoriteBtn.setOnClickListener(v -> getPresenter().toggleFavorite());
+
         swipeRefresh.setOnRefreshListener(this::fetchMangaFromSource);
 
         return view;
     }
 
-    public void onNextManga(Manga manga) {
+    public void onNextManga(Manga manga, Source source) {
         if (manga.initialized) {
-            setMangaInfo(manga);
+            setMangaInfo(manga, source);
         } else {
             // Initialize manga
             fetchMangaFromSource();
         }
     }
 
-    private void setMangaInfo(Manga manga) {
+    /**
+     * Set the info of the manga
+     *
+     * @param manga       manga object containing information about manga
+     * @param mangaSource the source of the manga
+     */
+    private void setMangaInfo(Manga manga, Source mangaSource) {
         artist.setText(manga.artist);
         author.setText(manga.author);
+
+        if (mangaSource != null) {
+            source.setText(mangaSource.getName());
+        }
         genres.setText(manga.genre);
         status.setText(manga.getStatus(getActivity()));
         description.setText(manga.description);
@@ -82,7 +116,7 @@ public class MangaInfoFragment extends BaseRxFragment<MangaInfoPresenter> {
         LazyHeaders headers = getPresenter().source.getGlideHeaders();
         if (manga.thumbnail_url != null && cover.getDrawable() == null) {
             if (manga.favorite) {
-                coverCache.saveAndLoadFromCache(cover, manga.thumbnail_url, headers);
+                coverCache.saveOrLoadFromCache(cover, manga.thumbnail_url, headers);
             } else {
                 coverCache.loadFromNetwork(cover, manga.thumbnail_url, headers);
             }
@@ -93,13 +127,51 @@ public class MangaInfoFragment extends BaseRxFragment<MangaInfoPresenter> {
         chapterCount.setText(String.valueOf(count));
     }
 
-    public void setFavoriteText(boolean isFavorite) {
+    private void setFavoriteText(boolean isFavorite) {
         favoriteBtn.setText(!isFavorite ? R.string.add_to_library : R.string.remove_from_library);
     }
 
     private void fetchMangaFromSource() {
         setRefreshing(true);
         getPresenter().fetchMangaFromSource();
+    }
+
+    private void selectImage() {
+        if (getPresenter().getManga().favorite) {
+
+            Intent intent = new Intent();
+            intent.setType("image/*");
+            intent.setAction(Intent.ACTION_GET_CONTENT);
+            startActivityForResult(Intent.createChooser(intent,
+                    getString(R.string.file_select_cover)), REQUEST_IMAGE_OPEN);
+        } else {
+            ToastUtil.showShort(getContext(), R.string.notification_first_add_to_library);
+        }
+
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (resultCode == Activity.RESULT_OK && requestCode == REQUEST_IMAGE_OPEN) {
+            // Get the file's content URI from the incoming Intent
+            Uri selectedImageUri = data.getData();
+
+            // Convert to absolute path to prevent FileNotFoundException
+            String result = IOHandler.getFilePath(selectedImageUri,
+                    getContext().getContentResolver(), getContext());
+
+            // Get file from filepath
+            File picture = new File(result != null ? result : "");
+
+            try {
+                // Update cover to selected file, show error if something went wrong
+                if (!getPresenter().editCoverWithLocalFile(picture, cover))
+                    ToastUtil.showShort(getContext(), R.string.notification_manga_update_failed);
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public void onFetchMangaDone() {

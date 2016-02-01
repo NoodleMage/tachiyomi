@@ -1,7 +1,6 @@
 package eu.kanade.tachiyomi.ui.reader.viewer.webtoon;
 
 import android.os.Bundle;
-import android.support.annotation.Nullable;
 import android.support.v7.widget.RecyclerView;
 import android.view.GestureDetector;
 import android.view.LayoutInflater;
@@ -30,12 +29,26 @@ public class WebtoonReader extends BaseReader {
     private Subscription decoderSubscription;
     private GestureDetector gestureDetector;
 
-    @Nullable
+    private boolean isReady;
+    private int scrollDistance;
+
+    private static final String SCROLL_STATE = "scroll_state";
+
+    private static final float LEFT_REGION = 0.33f;
+    private static final float RIGHT_REGION = 0.66f;
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedState) {
         adapter = new WebtoonAdapter(this);
+
+        int screenHeight = getResources().getDisplayMetrics().heightPixels;
+        scrollDistance = screenHeight * 3 / 4;
+
         layoutManager = new PreCachingLayoutManager(getActivity());
-        layoutManager.setExtraLayoutSpace(getResources().getDisplayMetrics().heightPixels);
+        layoutManager.setExtraLayoutSpace(screenHeight / 2);
+        if (savedState != null) {
+            layoutManager.onRestoreInstanceState(savedState.getParcelable(SCROLL_STATE));
+        }
 
         recycler = new RecyclerView(getActivity());
         recycler.setLayoutParams(new ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT));
@@ -45,28 +58,29 @@ public class WebtoonReader extends BaseReader {
 
         decoderSubscription = getReaderActivity().getPreferences().imageDecoder()
                 .asObservable()
-                .doOnNext(this::setRegionDecoderClass)
+                .doOnNext(this::setDecoderClass)
                 .skip(1)
                 .distinctUntilChanged()
-                .subscribe(v -> adapter.notifyDataSetChanged());
+                .subscribe(v -> recycler.setAdapter(adapter));
 
-        gestureDetector = new GestureDetector(getActivity(), new SimpleOnGestureListener() {
+        gestureDetector = new GestureDetector(recycler.getContext(), new SimpleOnGestureListener() {
             @Override
             public boolean onSingleTapConfirmed(MotionEvent e) {
-                getReaderActivity().onCenterSingleTap();
+                final float positionX = e.getX();
+
+                if (positionX < recycler.getWidth() * LEFT_REGION) {
+                    recycler.smoothScrollBy(0, -scrollDistance);
+                } else if (positionX > recycler.getWidth() * RIGHT_REGION) {
+                    recycler.smoothScrollBy(0, scrollDistance);
+                } else {
+                    getReaderActivity().onCenterSingleTap();
+                }
                 return true;
             }
-
-            @Override
-            public boolean onDown(MotionEvent e) {
-                // The only way I've found to allow panning. Double tap event (zoom) is lost
-                // but panning should be the most used one
-                return true;
-            }
-
         });
 
         setPages();
+        isReady = true;
 
         return recycler;
     }
@@ -83,6 +97,12 @@ public class WebtoonReader extends BaseReader {
         super.onPause();
     }
 
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putParcelable(SCROLL_STATE, layoutManager.onSaveInstanceState());
+    }
+
     private void unsubscribeStatus() {
         if (subscription != null && !subscription.isUnsubscribed())
             subscription.unsubscribe();
@@ -97,7 +117,9 @@ public class WebtoonReader extends BaseReader {
     public void onPageListReady(List<Page> pages, int currentPage) {
         if (this.pages != pages) {
             this.pages = pages;
-            if (isResumed()) {
+            // Restoring current page is not supported. It's getting weird scrolling jumps
+            // this.currentPage = currentPage;
+            if (isReady) {
                 setPages();
             }
         }
@@ -109,6 +131,7 @@ public class WebtoonReader extends BaseReader {
             recycler.clearOnScrollListeners();
             adapter.setPages(pages);
             recycler.setAdapter(adapter);
+            updatePageNumber();
             setScrollListener();
             observeStatus(0);
         }

@@ -3,8 +3,6 @@ package eu.kanade.tachiyomi.data.source.base;
 import android.content.Context;
 
 import com.bumptech.glide.load.model.LazyHeaders;
-import com.squareup.okhttp.Headers;
-import com.squareup.okhttp.Response;
 
 import org.jsoup.Jsoup;
 
@@ -23,6 +21,8 @@ import eu.kanade.tachiyomi.data.network.NetworkHelper;
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper;
 import eu.kanade.tachiyomi.data.source.model.MangasPage;
 import eu.kanade.tachiyomi.data.source.model.Page;
+import okhttp3.Headers;
+import okhttp3.Response;
 import rx.Observable;
 import rx.schedulers.Schedulers;
 
@@ -93,7 +93,7 @@ public abstract class Source extends BaseSource {
     }
 
     public Observable<List<Page>> getCachedPageListOrPullFromNetwork(final String chapterUrl) {
-        return chapterCache.getPageUrlsFromDiskCache(getChapterCacheKey(chapterUrl))
+        return chapterCache.getPageListFromCache(getChapterCacheKey(chapterUrl))
                 .onErrorResumeNext(throwable -> {
                     return pullPageListFromNetwork(chapterUrl);
                 })
@@ -168,7 +168,7 @@ public abstract class Source extends BaseSource {
         return getImageProgressResponse(page)
                 .flatMap(resp -> {
                     try {
-                        chapterCache.putImageToDiskCache(page.getImageUrl(), resp);
+                        chapterCache.putImageToCache(page.getImageUrl(), resp);
                     } catch (IOException e) {
                         return Observable.error(e);
                     }
@@ -182,7 +182,7 @@ public abstract class Source extends BaseSource {
 
     public void savePageList(String chapterUrl, List<Page> pages) {
         if (pages != null)
-            chapterCache.putPageUrlsToDiskCache(getChapterCacheKey(chapterUrl), pages);
+            chapterCache.putPageListToCache(getChapterCacheKey(chapterUrl), pages);
     }
 
     protected List<Page> convertToPages(List<String> pageUrls) {

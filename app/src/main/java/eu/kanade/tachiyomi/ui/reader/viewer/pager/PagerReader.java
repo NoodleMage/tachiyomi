@@ -19,8 +19,11 @@ public abstract class PagerReader extends BaseReader {
     protected PagerReaderAdapter adapter;
     protected Pager pager;
 
+    private boolean isReady;
     protected boolean transitions;
     protected CompositeSubscription subscriptions;
+
+    protected int scaleType = 1;
 
     protected void initializePager(Pager pager) {
         this.pager = pager;
@@ -61,7 +64,14 @@ public abstract class PagerReader extends BaseReader {
         subscriptions = new CompositeSubscription();
         subscriptions.add(getReaderActivity().getPreferences().imageDecoder()
                 .asObservable()
-                .doOnNext(this::setRegionDecoderClass)
+                .doOnNext(this::setDecoderClass)
+                .skip(1)
+                .distinctUntilChanged()
+                .subscribe(v -> adapter.notifyDataSetChanged()));
+
+        subscriptions.add(getReaderActivity().getPreferences().imageScaleType()
+                .asObservable()
+                .doOnNext(this::setImageScaleType)
                 .skip(1)
                 .distinctUntilChanged()
                 .subscribe(v -> adapter.notifyDataSetChanged()));
@@ -71,6 +81,7 @@ public abstract class PagerReader extends BaseReader {
                 .subscribe(value -> transitions = value));
 
         setPages();
+        isReady = true;
     }
 
     @Override
@@ -84,7 +95,7 @@ public abstract class PagerReader extends BaseReader {
         if (this.pages != pages) {
             this.pages = pages;
             this.currentPage = currentPage;
-            if (isResumed()) {
+            if (isReady) {
                 setPages();
             }
         }
@@ -108,6 +119,10 @@ public abstract class PagerReader extends BaseReader {
     @Override
     public boolean onImageTouch(MotionEvent motionEvent) {
         return pager.onImageTouch(motionEvent);
+    }
+
+    private void setImageScaleType(int scaleType) {
+        this.scaleType = scaleType;
     }
 
     public abstract void onFirstPageOut();
