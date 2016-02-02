@@ -17,6 +17,7 @@ import com.mikepenz.materialdrawer.model.PrimaryDrawerItem;
 import butterknife.Bind;
 import butterknife.ButterKnife;
 import eu.kanade.tachiyomi.R;
+import eu.kanade.tachiyomi.ui.backup.BackupFragment;
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity;
 import eu.kanade.tachiyomi.ui.catalogue.CatalogueFragment;
 import eu.kanade.tachiyomi.ui.download.DownloadFragment;
@@ -81,7 +82,6 @@ public class MainActivity extends BaseActivity {
                         new PrimaryDrawerItem()
                                 .withName(R.string.label_catalogues)
                                 .withIdentifier(R.id.nav_drawer_catalogues)
-
                                 .withIcon(GoogleMaterial.Icon.gmd_explore),
                         new PrimaryDrawerItem()
                                 .withName(R.string.label_download_queue)
@@ -92,7 +92,11 @@ public class MainActivity extends BaseActivity {
                                 .withName(R.string.label_settings)
                                 .withIdentifier(R.id.nav_drawer_settings)
                                 .withSelectable(false)
-                                .withIcon(GoogleMaterial.Icon.gmd_settings)
+                                .withIcon(GoogleMaterial.Icon.gmd_settings),
+                        new PrimaryDrawerItem()
+                                .withName(R.string.label_backup)
+                                .withIdentifier(R.id.nav_drawer_backup)
+                                .withIcon(GoogleMaterial.Icon.gmd_backup)
                 )
                 .withSavedInstance(savedState)
                 .withOnDrawerItemClickListener(
@@ -115,6 +119,8 @@ public class MainActivity extends BaseActivity {
                                     case R.id.nav_drawer_settings:
                                         startActivity(new Intent(this, SettingsActivity.class));
                                         break;
+                                    case R.id.nav_drawer_backup:
+                                        setFragment(BackupFragment.newInstance());
                                 }
                             }
                             return false;

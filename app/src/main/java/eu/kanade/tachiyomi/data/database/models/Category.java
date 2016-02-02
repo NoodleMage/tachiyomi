@@ -35,4 +35,8 @@ public class Category implements Serializable {
         c.id = 0;
         return c;
     }
+
+    public String getNameLower() {
+        return name.toLowerCase();
+    }
 }

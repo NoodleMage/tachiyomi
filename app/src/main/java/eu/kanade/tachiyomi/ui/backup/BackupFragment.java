@@ -33,4 +33,10 @@ public class BackupFragment extends BaseRxFragment<BackupPresenter> {
         getPresenter().createBackup(file);
     }
 
+    @OnClick(R.id.restore_button)
+    void onRestoreClick() {
+        File file = new File(getActivity().getExternalCacheDir(), "backup.json");
+        getPresenter().restoreBackup(file);
+    }
+
 }
