@@ -10,6 +10,8 @@ import eu.kanade.tachiyomi.data.backup.BackupManager;
 import eu.kanade.tachiyomi.data.database.DatabaseHelper;
 import eu.kanade.tachiyomi.ui.base.presenter.BasePresenter;
 import rx.Observable;
+import rx.android.schedulers.AndroidSchedulers;
+import rx.schedulers.Schedulers;
 
 public class BackupPresenter extends BasePresenter<BackupFragment> {
 
@@ -50,12 +52,18 @@ public class BackupPresenter extends BasePresenter<BackupFragment> {
         }
     }
 
-    private Observable getBackupObservable() {
-        return backupManager.getBackupObservable(backupFile);
+    private Observable<Boolean> getBackupObservable() {
+        return Observable.fromCallable(() -> {
+            backupManager.backupToFile(backupFile);
+            return true;
+        }).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread());
     }
 
-    private Observable getRestoreObservable() {
-        return backupManager.getRestoreObservable(restoreFile);
+    private Observable<Boolean> getRestoreObservable() {
+        return Observable.fromCallable(() -> {
+            backupManager.restoreFromFile(restoreFile);
+            return true;
+        }).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread());
     }
 
 }

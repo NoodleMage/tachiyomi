@@ -59,6 +59,10 @@ public class DatabaseHelper {
                 .build();
     }
 
+    public StorIOSQLite.Internal lowLevel() {
+        return db.internal();
+    }
+
     // Mangas related queries
 
     public PreparedGetListOfObjects<Manga> getMangas() {
@@ -323,6 +327,12 @@ public class DatabaseHelper {
     public PreparedPutObject<MangaSync> insertMangaSync(MangaSync manga) {
         return db.put()
                 .object(manga)
+                .prepare();
+    }
+
+    public PreparedPutCollectionOfObjects<MangaSync> insertMangasSync(List<MangaSync> mangas) {
+        return db.put()
+                .objects(mangas)
                 .prepare();
     }
 

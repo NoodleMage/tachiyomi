@@ -9,13 +9,10 @@ import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.pushtorefresh.storio.sqlite.operations.put.PutResult;
 
-import org.json.JSONException;
-
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Serializable;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,19 +23,20 @@ import eu.kanade.tachiyomi.data.database.models.Chapter;
 import eu.kanade.tachiyomi.data.database.models.Manga;
 import eu.kanade.tachiyomi.data.database.models.MangaCategory;
 import eu.kanade.tachiyomi.data.database.models.MangaSync;
-import rx.Observable;
-import rx.schedulers.Schedulers;
 
 /**
  * File format:
  *
  * {
- *     "mangas": [{
- *         "manga": {"id": 1, ...},
- *         "chapters": [{"id": 1, ...}],
- *         "manga_sync": [{"id": 1, ...}],
- *         "categories": ["cat1", "cat2"]
- *     }, { ... }],
+ *     "mangas": [
+ *         {
+ *             "manga": {"id": 1, ...},
+ *             "chapters": [{"id": 1, ...}],
+ *             "sync": [{"id": 1, ...}],
+ *             "categories": ["cat1", "cat2"]
+ *         },
+ *         { ... }
+ *     ],
  *     "categories": [
  *         {"id": 1, ...},
  *         {"id": 2, ...}
@@ -53,7 +51,7 @@ public class BackupManager {
     private static final String MANGA = "manga";
     private static final String MANGAS = "mangas";
     private static final String CHAPTERS = "chapters";
-    private static final String MANGA_SYNC = "manga_sync";
+    private static final String MANGA_SYNC = "sync";
     private static final String CATEGORIES = "categories";
 
     public BackupManager(DatabaseHelper db) {
@@ -61,59 +59,38 @@ public class BackupManager {
         gson = new Gson();
     }
 
-    public Observable<Serializable> getBackupObservable(File backupFile) {
-        return Observable.defer(() -> {
-            final JsonObject root = new JsonObject();
+    public void backupToFile(File backupFile) throws IOException {
+        final JsonObject root = backupToJson();
 
-            return Observable.concat(
-                    getBackupMangaObservable(root),
-                    getBackupCategoryObservable(root)
-            ).doOnCompleted(() -> saveFile(backupFile, root));
-
-        }).subscribeOn(Schedulers.io());
-    }
-
-    private void saveFile(File backupFile, JsonObject json) {
-        FileWriter writer;
-
+        FileWriter writer = null;
         try {
             writer = new FileWriter(backupFile);
-            gson.toJson(json, writer);
-            writer.close();
-        } catch (Exception e) {
-            e.printStackTrace();
+            gson.toJson(root, writer);
+        } finally {
+            if (writer != null)
+                writer.close();
         }
     }
 
-    private Observable<Manga> getBackupMangaObservable(JsonObject root) {
-        JsonArray entries = new JsonArray();
-        root.add(MANGAS, entries);
-        return Observable.from(db.getFavoriteMangas().executeAsBlocking())
-                .concatMap(manga -> {
-                    try {
-                        backupManga(manga, entries);
-                        return Observable.just(manga);
-                    } catch (JSONException e) {
-                        return Observable.error(e);
-                    }
-                });
+    public JsonObject backupToJson() {
+        final JsonObject root = new JsonObject();
+
+        final JsonArray mangaEntries = new JsonArray();
+        root.add(MANGAS, mangaEntries);
+        for (Manga manga : db.getFavoriteMangas().executeAsBlocking()) {
+            backupManga(manga, mangaEntries);
+        }
+
+        final JsonArray categoryEntries = new JsonArray();
+        root.add(CATEGORIES, categoryEntries);
+        for (Category category : db.getCategories().executeAsBlocking()) {
+            backupCategory(category, categoryEntries);
+        }
+
+        return root;
     }
 
-    private Observable<Category> getBackupCategoryObservable(JsonObject root) {
-        JsonArray entries = new JsonArray();
-        root.add(CATEGORIES, entries);
-        return Observable.from(db.getCategories().executeAsBlocking())
-                .concatMap(category -> {
-                    try {
-                        backupCategory(category, entries);
-                        return Observable.just(category);
-                    } catch (JSONException e) {
-                        return Observable.error(e);
-                    }
-                });
-    }
-
-    public void backupManga(Manga manga, JsonArray entries) throws JSONException {
+    private void backupManga(Manga manga, JsonArray entries) {
         // Entry for this manga
         JsonObject entry = new JsonObject();
 
@@ -146,33 +123,37 @@ public class BackupManager {
         entries.add(entry);
     }
 
-    public void backupCategory(Category category, JsonArray entries) throws JSONException {
+    private void backupCategory(Category category, JsonArray entries) {
         entries.add(gson.toJsonTree(category));
     }
 
-    public Observable getRestoreObservable(File restoreFile) {
-        return Observable.defer(() -> {
-            JsonReader reader = null;
-            try {
-                reader = new JsonReader(new FileReader(restoreFile));
-                JsonObject root = new JsonParser().parse(reader).getAsJsonObject();
-                restoreCategories(root);
-                restoreMangas(root);
-                return Observable.just(true);
-            } catch (Exception e) {
-                return Observable.error(e);
-            } finally {
-                if (reader != null)
-                    try { reader.close(); } catch (IOException e) { /* Do nothing */ }
-            }
-        }).subscribeOn(Schedulers.io());
-
+    public void restoreFromFile(File restoreFile) throws IOException {
+        JsonReader reader = null;
+        try {
+            reader = new JsonReader(new FileReader(restoreFile));
+            JsonObject root = new JsonParser().parse(reader).getAsJsonObject();
+            restoreFromJson(root);
+        } finally {
+            if (reader != null)
+                reader.close();
+        }
     }
 
-    public void restoreCategories(JsonObject root) {
+    public void restoreFromJson(JsonObject root) {
+        try {
+            db.lowLevel().beginTransaction();
+            restoreCategories(root);
+            restoreMangas(root);
+            db.lowLevel().setTransactionSuccessful();
+        } finally {
+            db.lowLevel().endTransaction();
+        }
+    }
+
+    private void restoreCategories(JsonObject root) {
         // Get categories from file and from db
         List<Category> dbCategories = db.getCategories().executeAsBlocking();
-        List<Category> backupCategories = gson.fromJson(root.get(CATEGORIES),
+        List<Category> backupCategories = getArrayOrEmpty(root.get(CATEGORIES),
                 new TypeToken<List<Category>>() {}.getType());
 
         // Iterate over them
@@ -199,8 +180,10 @@ public class BackupManager {
         }
     }
 
-    public void restoreMangas(JsonObject root) {
+    private void restoreMangas(JsonObject root) {
         JsonArray backupMangas = gson.fromJson(root.get(MANGAS), JsonArray.class);
+        if (backupMangas == null)
+            return;
 
         Type chapterToken = new TypeToken<List<Chapter>>(){}.getType();
         Type mangaSyncToken = new TypeToken<List<MangaSync>>(){}.getType();
@@ -259,7 +242,7 @@ public class BackupManager {
                 Chapter dbChapter = dbChapters.get(pos);
                 // If one of them was read, the chapter will be marked as read
                 dbChapter.read = backupChapter.read || dbChapter.read;
-                dbChapter.last_page_read = backupChapter.last_page_read;
+                dbChapter.last_page_read = Math.max(backupChapter.last_page_read, dbChapter.last_page_read);
                 chaptersToUpdate.add(dbChapter);
             } else {
                 // Insert new chapter. Let the db assign the id
@@ -294,7 +277,26 @@ public class BackupManager {
     }
 
     private void restoreSyncForManga(Manga manga, List<MangaSync> mangasSync) {
-        // TODO
+        List<MangaSync> dbSyncs = db.getMangasSync(manga).executeAsBlocking();
+        List<MangaSync> syncToUpdate = new ArrayList<>();
+        for (MangaSync backupSync : mangasSync) {
+            // Try to find existing chapter in db
+            int pos = dbSyncs.indexOf(backupSync);
+            if (pos != -1) {
+                MangaSync dbSync = dbSyncs.get(pos);
+                // Mark the max chapter as read and nothing else
+                dbSync.last_chapter_read = Math.max(backupSync.last_chapter_read, dbSync.last_chapter_read);
+                syncToUpdate.add(dbSync);
+            } else {
+                // Insert new sync. Let the db assign the id
+                backupSync.id = null;
+                syncToUpdate.add(backupSync);
+            }
+        }
+
+        if (!syncToUpdate.isEmpty()) {
+            db.insertMangasSync(syncToUpdate).executeAsBlocking();
+        }
     }
 
     private <T> List<T> getArrayOrEmpty(JsonElement element, Type type) {
