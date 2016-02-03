@@ -25,15 +25,16 @@ import eu.kanade.tachiyomi.data.database.models.MangaCategory;
 import eu.kanade.tachiyomi.data.database.models.MangaSync;
 
 /**
- * File format:
+ * This class provides the necessary methods to create and restore backups for the data of the
+ * application. The backup follows a JSON structure, with the following scheme:
  *
  * {
  *     "mangas": [
  *         {
  *             "manga": {"id": 1, ...},
- *             "chapters": [{"id": 1, ...}],
- *             "sync": [{"id": 1, ...}],
- *             "categories": ["cat1", "cat2"]
+ *             "chapters": [{"id": 1, ...}, {...}],
+ *             "sync": [{"id": 1, ...}, {...}],
+ *             "categories": ["cat1", "cat2", ...]
  *         },
  *         { ... }
  *     ],
@@ -59,12 +60,18 @@ public class BackupManager {
         gson = new Gson();
     }
 
-    public void backupToFile(File backupFile) throws IOException {
+    /**
+     * Backups the data of the application to a file.
+     *
+     * @param file the file where the backup will be saved.
+     * @throws IOException if there's any IO error.
+     */
+    public void backupToFile(File file) throws IOException {
         final JsonObject root = backupToJson();
 
         FileWriter writer = null;
         try {
-            writer = new FileWriter(backupFile);
+            writer = new FileWriter(file);
             gson.toJson(root, writer);
         } finally {
             if (writer != null)
@@ -72,25 +79,38 @@ public class BackupManager {
         }
     }
 
+    /**
+     * Creates a JSON object containing the backup of the app's data.
+     *
+     * @return the backup as a JSON object.
+     */
     public JsonObject backupToJson() {
         final JsonObject root = new JsonObject();
 
+        // Backup library mangas and its dependencies
         final JsonArray mangaEntries = new JsonArray();
         root.add(MANGAS, mangaEntries);
         for (Manga manga : db.getFavoriteMangas().executeAsBlocking()) {
-            backupManga(manga, mangaEntries);
+            mangaEntries.add(backupManga(manga));
         }
 
+        // Backup categories
         final JsonArray categoryEntries = new JsonArray();
         root.add(CATEGORIES, categoryEntries);
         for (Category category : db.getCategories().executeAsBlocking()) {
-            backupCategory(category, categoryEntries);
+            categoryEntries.add(backupCategory(category));
         }
 
         return root;
     }
 
-    private void backupManga(Manga manga, JsonArray entries) {
+    /**
+     * Backups a manga and its related data (chapters, categories this manga is in, sync...).
+     *
+     * @param manga the manga to backup.
+     * @return a JSON object containing all the data of the manga.
+     */
+    private JsonObject backupManga(Manga manga) {
         // Entry for this manga
         JsonObject entry = new JsonObject();
 
@@ -119,18 +139,29 @@ public class BackupManager {
             entry.add(CATEGORIES, gson.toJsonTree(categoriesNames));
         }
 
-        // Finally add it to the manga list
-        entries.add(entry);
+        return entry;
     }
 
-    private void backupCategory(Category category, JsonArray entries) {
-        entries.add(gson.toJsonTree(category));
+    /**
+     * Backups a category.
+     *
+     * @param category the category to backup.
+     * @return a JSON object containing the data of the category.
+     */
+    private JsonElement backupCategory(Category category) {
+        return gson.toJsonTree(category);
     }
 
-    public void restoreFromFile(File restoreFile) throws IOException {
+    /**
+     * Restores a backup from a file.
+     *
+     * @param file the file containing the backup.
+     * @throws IOException if there's any IO error.
+     */
+    public void restoreFromFile(File file) throws IOException {
         JsonReader reader = null;
         try {
-            reader = new JsonReader(new FileReader(restoreFile));
+            reader = new JsonReader(new FileReader(file));
             JsonObject root = new JsonParser().parse(reader).getAsJsonObject();
             restoreFromJson(root);
         } finally {
@@ -139,21 +170,41 @@ public class BackupManager {
         }
     }
 
+    /**
+     * Restores a backup from a JSON object. Everything executes in a single transaction so that
+     * anything is modified if there's an error.
+     *
+     * @param root the root of the JSON.
+     */
     public void restoreFromJson(JsonObject root) {
         try {
             db.lowLevel().beginTransaction();
-            restoreCategories(root);
-            restoreMangas(root);
+
+            // Restore categories
+            JsonElement categories = root.get(CATEGORIES);
+            if (categories != null)
+                restoreCategories(categories.getAsJsonArray());
+
+            // Restore mangas
+            JsonElement mangas = root.get(MANGAS);
+            if (mangas != null)
+                restoreMangas(mangas.getAsJsonArray());
+
             db.lowLevel().setTransactionSuccessful();
         } finally {
             db.lowLevel().endTransaction();
         }
     }
 
-    private void restoreCategories(JsonObject root) {
+    /**
+     * Restores the categories.
+     *
+     * @param jsonCategories the categories of the json.
+     */
+    private void restoreCategories(JsonArray jsonCategories) {
         // Get categories from file and from db
         List<Category> dbCategories = db.getCategories().executeAsBlocking();
-        List<Category> backupCategories = getArrayOrEmpty(root.get(CATEGORIES),
+        List<Category> backupCategories = getArrayOrEmpty(jsonCategories,
                 new TypeToken<List<Category>>() {}.getType());
 
         // Iterate over them
@@ -180,33 +231,38 @@ public class BackupManager {
         }
     }
 
-    private void restoreMangas(JsonObject root) {
-        JsonArray backupMangas = gson.fromJson(root.get(MANGAS), JsonArray.class);
-        if (backupMangas == null)
-            return;
-
+    /**
+     * Restores all the mangas and its related data.
+     *
+     * @param jsonMangas the mangas and its related data (chapters, sync, categories) from the json.
+     */
+    private void restoreMangas(JsonArray jsonMangas) {
         Type chapterToken = new TypeToken<List<Chapter>>(){}.getType();
         Type mangaSyncToken = new TypeToken<List<MangaSync>>(){}.getType();
         Type categoriesNamesToken = new TypeToken<List<String>>(){}.getType();
 
-        for (JsonElement backupManga : backupMangas) {
+        for (JsonElement backupManga : jsonMangas) {
             // Map every entry to objects
             JsonObject element = backupManga.getAsJsonObject();
             Manga manga = gson.fromJson(element.get(MANGA), Manga.class);
             List<Chapter> chapters = getArrayOrEmpty(element.get(CHAPTERS), chapterToken);
-            List<MangaSync> mangasSync = getArrayOrEmpty(element.get(MANGA_SYNC), mangaSyncToken);
+            List<MangaSync> sync = getArrayOrEmpty(element.get(MANGA_SYNC), mangaSyncToken);
             List<String> categories = getArrayOrEmpty(element.get(CATEGORIES), categoriesNamesToken);
 
-            restoreManga(manga, chapters, mangasSync, categories);
+            // Restore everything related to this manga
+            restoreManga(manga);
             restoreChaptersForManga(manga, chapters);
-            restoreSyncForManga(manga, mangasSync);
+            restoreSyncForManga(manga, sync);
             restoreCategoriesForManga(manga, categories);
         }
     }
 
-    private void restoreManga(Manga manga, List<Chapter> chapters,
-                              List<MangaSync> mangasSync, List<String> categories) {
-
+    /**
+     * Restores a manga.
+     *
+     * @param manga the manga to restore.
+     */
+    private void restoreManga(Manga manga) {
         // Try to find existing manga in db
         Manga dbManga = db.getManga(manga.url, manga.source).executeAsBlocking();
         if (dbManga == null) {
@@ -222,23 +278,27 @@ public class BackupManager {
             manga.favorite = true;
             db.insertManga(manga).executeAsBlocking();
         }
+    }
 
+    /**
+     * Restores the chapters of a manga.
+     *
+     * @param manga the manga whose chapters have to be restored.
+     * @param chapters the chapters to restore.
+     */
+    private void restoreChaptersForManga(Manga manga, List<Chapter> chapters) {
         // Fix foreign keys with the current manga id
         for (Chapter chapter : chapters) {
             chapter.manga_id = manga.id;
         }
-        for (MangaSync mangaSync : mangasSync) {
-            mangaSync.manga_id = manga.id;
-        }
-    }
 
-    private void restoreChaptersForManga(Manga manga, List<Chapter> chapters) {
         List<Chapter> dbChapters = db.getChapters(manga).executeAsBlocking();
         List<Chapter> chaptersToUpdate = new ArrayList<>();
         for (Chapter backupChapter : chapters) {
             // Try to find existing chapter in db
             int pos = dbChapters.indexOf(backupChapter);
             if (pos != -1) {
+                // The chapter is already in the db, only update its fields
                 Chapter dbChapter = dbChapters.get(pos);
                 // If one of them was read, the chapter will be marked as read
                 dbChapter.read = backupChapter.read || dbChapter.read;
@@ -251,11 +311,18 @@ public class BackupManager {
             }
         }
 
+        // Update database
         if (!chaptersToUpdate.isEmpty()) {
             db.insertChapters(chaptersToUpdate).executeAsBlocking();
         }
     }
 
+    /**
+     * Restores the categories a manga is in.
+     *
+     * @param manga the manga whose categories have to be restored.
+     * @param categories the categories to restore.
+     */
     private void restoreCategoriesForManga(Manga manga, List<String> categories) {
         List<Category> dbCategories = db.getCategories().executeAsBlocking();
         List<MangaCategory> mangaCategoriesToUpdate = new ArrayList<>();
@@ -268,6 +335,7 @@ public class BackupManager {
             }
         }
 
+        // Update database
         if (!mangaCategoriesToUpdate.isEmpty()) {
             List<Manga> mangaAsList = new ArrayList<>();
             mangaAsList.add(manga);
@@ -276,13 +344,25 @@ public class BackupManager {
         }
     }
 
-    private void restoreSyncForManga(Manga manga, List<MangaSync> mangasSync) {
+    /**
+     * Restores the sync of a manga.
+     *
+     * @param manga the manga whose sync have to be restored.
+     * @param sync the sync to restore.
+     */
+    private void restoreSyncForManga(Manga manga, List<MangaSync> sync) {
+        // Fix foreign keys with the current manga id
+        for (MangaSync mangaSync : sync) {
+            mangaSync.manga_id = manga.id;
+        }
+
         List<MangaSync> dbSyncs = db.getMangasSync(manga).executeAsBlocking();
         List<MangaSync> syncToUpdate = new ArrayList<>();
-        for (MangaSync backupSync : mangasSync) {
+        for (MangaSync backupSync : sync) {
             // Try to find existing chapter in db
             int pos = dbSyncs.indexOf(backupSync);
             if (pos != -1) {
+                // The sync is already in the db, only update its fields
                 MangaSync dbSync = dbSyncs.get(pos);
                 // Mark the max chapter as read and nothing else
                 dbSync.last_chapter_read = Math.max(backupSync.last_chapter_read, dbSync.last_chapter_read);
@@ -294,11 +374,20 @@ public class BackupManager {
             }
         }
 
+        // Update database
         if (!syncToUpdate.isEmpty()) {
             db.insertMangasSync(syncToUpdate).executeAsBlocking();
         }
     }
 
+    /**
+     * Returns a list of items from a json element, or an empty list if the element is null.
+     *
+     * @param element the json to be mapped to a list of items.
+     * @param type the gson mapping to restore the list.
+     * @param <T> the type of the returned list
+     * @return a list of items.
+     */
     private <T> List<T> getArrayOrEmpty(JsonElement element, Type type) {
         List<T> entries = gson.fromJson(element, type);
         return entries != null ? entries : new ArrayList<>();

@@ -57,6 +57,14 @@ public class BackupTest {
     }
 
     @Test
+    public void testRestoreEmptyCategory() {
+        root = createRootJson(null, toJson(new ArrayList<>()));
+        backupManager.restoreFromJson(root);
+        List<Category> dbCats = db.getCategories().executeAsBlocking();
+        assertThat(dbCats).isEmpty();
+    }
+
+    @Test
     public void testRestoreExistingCategory() {
         String catName = "cat";
         db.insertCategory(createCategory(catName)).executeAsBlocking();
