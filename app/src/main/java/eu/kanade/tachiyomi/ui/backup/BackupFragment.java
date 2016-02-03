@@ -11,6 +11,7 @@ import butterknife.ButterKnife;
 import butterknife.OnClick;
 import eu.kanade.tachiyomi.R;
 import eu.kanade.tachiyomi.ui.base.fragment.BaseRxFragment;
+import eu.kanade.tachiyomi.util.ToastUtil;
 import nucleus.factory.RequiresPresenter;
 
 @RequiresPresenter(BackupPresenter.class)
@@ -39,4 +40,23 @@ public class BackupFragment extends BaseRxFragment<BackupPresenter> {
         getPresenter().restoreBackup(file);
     }
 
+    public void onBackupCompleted() {
+        // TODO fix strings etc
+        ToastUtil.showShort(getActivity(), "Backup completed");
+    }
+
+    public void onRestoreCompleted() {
+        // TODO fix strings etc
+        ToastUtil.showShort(getActivity(), "Restore completed");
+    }
+
+    public void onBackupError() {
+        // TODO fix strings etc
+        ToastUtil.showShort(getActivity(), "Backup error");
+    }
+
+    public void onRestoreError() {
+        // TODO fix strings etc
+        ToastUtil.showShort(getActivity(), "Restore error");
+    }
 }

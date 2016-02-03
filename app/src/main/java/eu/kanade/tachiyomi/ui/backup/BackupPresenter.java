@@ -31,11 +31,13 @@ public class BackupPresenter extends BasePresenter<BackupFragment> {
 
         restartableLatestCache(CREATE_BACKUP,
                 this::getBackupObservable,
-                (view, next) -> {});
+                (view, next) -> view.onBackupCompleted(),
+                (view, error) -> view.onBackupError());
 
         restartableLatestCache(RESTORE_BACKUP,
                 this::getRestoreObservable,
-                (view, next) -> {});
+                (view, next) -> view.onRestoreCompleted(),
+                (view, error) -> view.onRestoreError());
     }
 
     public void createBackup(File backupFile) {
