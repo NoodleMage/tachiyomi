@@ -26,7 +26,7 @@ class DividerItemDecoration : RecyclerView.ItemDecoration {
     override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State?) {
         super.getItemOffsets(outRect, view, parent, state)
         if (divider == null) return
-        if (parent.getChildPosition(view) < 1) return
+        if (parent.getChildAdapterPosition(view) < 1) return
 
         if (getOrientation(parent) == LinearLayoutManager.VERTICAL)
             outRect.top = divider.intrinsicHeight

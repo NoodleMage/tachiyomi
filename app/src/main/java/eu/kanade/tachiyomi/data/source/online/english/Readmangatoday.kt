@@ -47,7 +47,7 @@ class Readmangatoday(context: Context, override val id: Int) : ParsedOnlineSourc
             page.url = searchMangaInitialUrl(query)
         }
 
-        var builder = okhttp3.FormBody.Builder()
+        val builder = okhttp3.FormBody.Builder()
         builder.add("query", query)
 
         return POST(page.url, headers, builder.build())
@@ -96,7 +96,7 @@ class Readmangatoday(context: Context, override val id: Int) : ParsedOnlineSourc
 
         if (dateWords.size == 3) {
             val timeAgo = Integer.parseInt(dateWords[0])
-            var date : Calendar = Calendar.getInstance()
+            val date : Calendar = Calendar.getInstance()
 
             if (dateWords[1].contains("Minute")) {
                 date.add(Calendar.MINUTE, - timeAgo)
@@ -112,7 +112,7 @@ class Readmangatoday(context: Context, override val id: Int) : ParsedOnlineSourc
                 date.add(Calendar.YEAR, -timeAgo)
             }
 
-            return date.getTimeInMillis()
+            return date.timeInMillis
         }
 
         return 0L
