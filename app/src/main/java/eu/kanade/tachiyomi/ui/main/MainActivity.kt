@@ -106,8 +106,11 @@ class MainActivity : BaseActivity() {
                         .addNextIntent(Intent(this, MainActivity::class.java))
                         .startActivities()
             } else if (resultCode and SettingsActivity.FLAG_THEME_CHANGED != 0) {
-                recreate()
+                // Delay activity recreation to avoid fragment leaks.
+                nav_view.post { recreate() }
             }
+        } else {
+            super.onActivityResult(requestCode, resultCode, data)
         }
     }
 

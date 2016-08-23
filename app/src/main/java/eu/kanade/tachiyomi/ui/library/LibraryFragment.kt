@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.ui.library
 
 import android.app.Activity
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.support.design.widget.TabLayout
 import android.support.v4.view.ViewPager
@@ -9,11 +10,13 @@ import android.support.v7.view.ActionMode
 import android.support.v7.widget.SearchView
 import android.view.*
 import com.afollestad.materialdialogs.MaterialDialog
+import com.f2prateek.rx.preferences.Preference
 import eu.davidea.flexibleadapter.FlexibleAdapter
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.models.Category
 import eu.kanade.tachiyomi.data.database.models.Manga
 import eu.kanade.tachiyomi.data.library.LibraryUpdateService
+import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.data.preference.getOrDefault
 import eu.kanade.tachiyomi.ui.base.fragment.BaseRxFragment
 import eu.kanade.tachiyomi.ui.category.CategoryActivity
@@ -22,6 +25,8 @@ import eu.kanade.tachiyomi.util.toast
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.fragment_library.*
 import nucleus.factory.RequiresPresenter
+import rx.Subscription
+import uy.kohesive.injekt.injectLazy
 import java.io.IOException
 
 /**
@@ -36,6 +41,11 @@ class LibraryFragment : BaseRxFragment<LibraryPresenter>(), ActionMode.Callback 
      */
     lateinit var adapter: LibraryAdapter
         private set
+
+    /**
+     * Preferences.
+     */
+    val preferences: PreferencesHelper by injectLazy()
 
     /**
      * TabLayout of the categories.
@@ -74,6 +84,23 @@ class LibraryFragment : BaseRxFragment<LibraryPresenter>(), ActionMode.Callback 
      */
     var isFilterUnread = false
 
+    /**
+     * Number of manga per row in grid mode.
+     */
+    var mangaPerRow = 0
+        private set
+
+    /**
+     * A pool to share view holders between all the registered categories (fragments).
+     */
+    // TODO find out why this breaks sometimes
+//    var pool = RecyclerView.RecycledViewPool().apply { setMaxRecycledViews(0, 20) }
+//        private set(value) {
+//            field = value.apply { setMaxRecycledViews(0, 20) }
+//        }
+
+    private var numColumnsSubscription: Subscription? = null
+
     companion object {
         /**
          * Key to change the cover of a manga in [onActivityResult].
@@ -103,8 +130,8 @@ class LibraryFragment : BaseRxFragment<LibraryPresenter>(), ActionMode.Callback 
     override fun onCreate(savedState: Bundle?) {
         super.onCreate(savedState)
         setHasOptionsMenu(true)
-        isFilterDownloaded = presenter.preferences.filterDownloaded().get() as Boolean
-        isFilterUnread = presenter.preferences.filterUnread().get() as Boolean
+        isFilterDownloaded = preferences.filterDownloaded().get() as Boolean
+        isFilterUnread = preferences.filterUnread().get() as Boolean
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedState: Bundle?): View? {
@@ -118,7 +145,7 @@ class LibraryFragment : BaseRxFragment<LibraryPresenter>(), ActionMode.Callback 
         view_pager.adapter = adapter
         view_pager.addOnPageChangeListener(object : ViewPager.SimpleOnPageChangeListener() {
             override fun onPageSelected(position: Int) {
-                presenter.preferences.lastUsedCategory().set(position)
+                preferences.lastUsedCategory().set(position)
             }
         })
         tabs.setupWithViewPager(view_pager)
@@ -128,8 +155,14 @@ class LibraryFragment : BaseRxFragment<LibraryPresenter>(), ActionMode.Callback 
             query = savedState.getString(QUERY_KEY)
             presenter.searchSubject.onNext(query)
         } else {
-            activeCategory = presenter.preferences.lastUsedCategory().getOrDefault()
+            activeCategory = preferences.lastUsedCategory().getOrDefault()
         }
+
+        numColumnsSubscription = getColumnsPreferenceForCurrentOrientation().asObservable()
+                .doOnNext { mangaPerRow = it }
+                .skip(1)
+                // Set again the adapter to recalculate the covers height
+                .subscribe { reattachAdapter() }
     }
 
     override fun onResume() {
@@ -138,6 +171,7 @@ class LibraryFragment : BaseRxFragment<LibraryPresenter>(), ActionMode.Callback 
     }
 
     override fun onDestroyView() {
+        numColumnsSubscription?.unsubscribe()
         tabs.setupWithViewPager(null)
         tabs.visibility = View.GONE
         super.onDestroyView()
@@ -178,6 +212,7 @@ class LibraryFragment : BaseRxFragment<LibraryPresenter>(), ActionMode.Callback 
                 return true
             }
         })
+
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -186,7 +221,7 @@ class LibraryFragment : BaseRxFragment<LibraryPresenter>(), ActionMode.Callback 
                 // Change unread filter status.
                 isFilterUnread = !isFilterUnread
                 // Update settings.
-                presenter.preferences.filterUnread().set(isFilterUnread)
+                preferences.filterUnread().set(isFilterUnread)
                 // Apply filter.
                 onFilterCheckboxChanged()
             }
@@ -194,7 +229,7 @@ class LibraryFragment : BaseRxFragment<LibraryPresenter>(), ActionMode.Callback 
                 // Change downloaded filter status.
                 isFilterDownloaded = !isFilterDownloaded
                 // Update settings.
-                presenter.preferences.filterDownloaded().set(isFilterDownloaded)
+                preferences.filterDownloaded().set(isFilterDownloaded)
                 // Apply filter.
                 onFilterCheckboxChanged()
             }
@@ -203,11 +238,12 @@ class LibraryFragment : BaseRxFragment<LibraryPresenter>(), ActionMode.Callback 
                 isFilterUnread = false
                 isFilterDownloaded = false
                 // Update settings.
-                presenter.preferences.filterUnread().set(isFilterUnread)
-                presenter.preferences.filterDownloaded().set(isFilterDownloaded)
+                preferences.filterUnread().set(isFilterUnread)
+                preferences.filterDownloaded().set(isFilterDownloaded)
                 // Apply filter
                 onFilterCheckboxChanged()
             }
+            R.id.action_library_display_mode -> swapDisplayMode()
             R.id.action_update_library -> {
                 LibraryUpdateService.start(activity, true)
             }
@@ -226,9 +262,39 @@ class LibraryFragment : BaseRxFragment<LibraryPresenter>(), ActionMode.Callback 
      */
     private fun onFilterCheckboxChanged() {
         presenter.updateLibrary()
-        adapter.notifyDataSetChanged()
         adapter.refreshRegisteredAdapters()
         activity.supportInvalidateOptionsMenu()
+    }
+
+    /**
+     * Swap display mode
+     */
+    private fun swapDisplayMode() {
+        presenter.swapDisplayMode()
+        reattachAdapter()
+    }
+
+    /**
+     * Reattaches the adapter to the view pager to recreate fragments
+     */
+    private fun reattachAdapter() {
+//        pool.clear()
+//        pool = RecyclerView.RecycledViewPool()
+        val position = view_pager.currentItem
+        view_pager.adapter = adapter
+        view_pager.currentItem = position
+    }
+
+    /**
+     * Returns a preference for the number of manga per row based on the current orientation.
+     *
+     * @return the preference.
+     */
+    private fun getColumnsPreferenceForCurrentOrientation(): Preference<Int> {
+        return if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT)
+            preferences.portraitColumns()
+        else
+            preferences.landscapeColumns()
     }
 
     /**

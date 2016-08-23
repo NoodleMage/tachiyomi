@@ -39,12 +39,12 @@ class LibraryPresenter : BasePresenter<LibraryFragment>() {
     /**
      * Search query of the library.
      */
-    val searchSubject = BehaviorSubject.create<String>()
+    val searchSubject: BehaviorSubject<String> = BehaviorSubject.create<String>()
 
     /**
      * Subject to notify the library's viewpager for updates.
      */
-    val libraryMangaSubject = BehaviorSubject.create<LibraryMangaEvent>()
+    val libraryMangaSubject: BehaviorSubject<LibraryMangaEvent> = BehaviorSubject.create<LibraryMangaEvent>()
 
     /**
      * Database.
@@ -229,7 +229,7 @@ class LibraryPresenter : BasePresenter<LibraryFragment>() {
      *
      * @param mangas the list of manga.
      */
-    fun getCommonCategories(mangas: List<Manga>) = mangas.toSet()
+    fun getCommonCategories(mangas: List<Manga>): Collection<Category> = mangas.toSet()
             .map { db.getCategoriesForManga(it).executeAsBlocking() }
             .reduce { set1: Iterable<Category>, set2 -> set1.intersect(set2) }
 
@@ -283,6 +283,14 @@ class LibraryPresenter : BasePresenter<LibraryFragment>() {
             return true
         }
         return false
+    }
+
+    /**
+     * Changes the active display mode.
+     */
+    fun swapDisplayMode() {
+        val displayAsList = preferences.libraryAsList().getOrDefault()
+        preferences.libraryAsList().set(!displayAsList)
     }
 
 }
