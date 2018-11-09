@@ -1,42 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout
-  xmlns:android="http://schemas.android.com/apk/res/android"
-  xmlns:app="http://schemas.android.com/apk/res-auto"
-  xmlns:tools="http://schemas.android.com/tools"
-  android:layout_width="match_parent"
-  android:layout_height="wrap_content">
-
-  <androidx.constraintlayout.widget.ConstraintLayout
-    android:id="@+id/card"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="@dimen/material_component_lists_two_line_height"
-      android:background="@drawable/background_ripple">
+    android:layout_height="wrap_content">
 
-    <ImageView
-      android:id="@+id/image"
-      android:layout_width="0dp"
-      android:layout_height="0dp"
-      android:padding="8dp"
-      app:layout_constraintBottom_toBottomOf="parent"
-      app:layout_constraintDimensionRatio="1:1"
-      app:layout_constraintLeft_toLeftOf="parent"
-      app:layout_constraintTop_toTopOf="parent"
-      android:src="@mipmap/ic_launcher_round" />
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/card"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/md_lists_single_line_normal_avatar_height"
+        android:background="@drawable/background_ripple">
 
-    <TextView
-      android:id="@+id/title"
-      android:layout_width="0dp"
-      android:layout_height="wrap_content"
-      android:layout_marginEnd="8dp"
-      android:ellipsize="end"
-      android:maxLines="1"
-      android:textAppearance="@style/TextAppearance.Subtitle1"
-      app:layout_constraintBottom_toBottomOf="parent"
-      app:layout_constraintEnd_toEndOf="parent"
-      app:layout_constraintStart_toEndOf="@+id/image"
-      app:layout_constraintTop_toTopOf="parent"
-      tools:text="Source title" />
+        <ImageView
+            android:id="@+id/image"
+            android:layout_width="@dimen/md_lists_single_line_normal_avatar_avatar_size"
+            android:layout_height="@dimen/md_lists_single_line_normal_avatar_avatar_size"
+            android:layout_marginStart="@dimen/md_lists_single_line_normal_avatar_avatar_margin_start_end"
+            android:layout_marginTop="@dimen/md_lists_single_line_normal_avatar_avatar_margin_top_bottom"
+            android:layout_marginEnd="@dimen/md_lists_single_line_normal_avatar_avatar_margin_start_end"
+            android:layout_marginBottom="@dimen/md_lists_single_line_normal_avatar_avatar_margin_top_bottom"
+            android:src="@mipmap/ic_launcher"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/title"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:visibility="visible" />
 
-  </androidx.constraintlayout.widget.ConstraintLayout>
+        <TextView
+            android:id="@id/title"
+            style="@style/TextAppearance.Subtitle1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:maxLines="1"
+            android:text="Single-Line item"
+            android:layout_marginEnd="@dimen/md_lists_single_line_normal_avatar_avatar_margin_start_end"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/image"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </FrameLayout>

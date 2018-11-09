@@ -25,4 +25,13 @@
   <dimen name="navigation_drawer_header_height">158dp</dimen>
   <dimen name="navigation_drawer_header_margin">16dp</dimen>
 
+  <!--Single line, normal avatar-->
+  <dimen name="md_lists_single_line_normal_avatar_height">56dp</dimen>
+  <dimen name="md_lists_single_line_normal_avatar_icon_margin_top_bottom">24dp</dimen>
+  <dimen name="md_lists_single_line_normal_avatar_avatar_size">40dp</dimen>
+  <dimen name="md_lists_single_line_normal_avatar_avatar_margin_top_bottom">8dp</dimen>
+  <dimen name="md_lists_single_line_normal_avatar_avatar_margin_start_end">16dp</dimen>
+  <dimen name="md_lists_single_line_normal_avatar_icon_size">24dp</dimen>
+  <dimen name="md_lists_single_line_normal_avatar_icon_margin_start_end">16dp</dimen>
+
 </resources>
