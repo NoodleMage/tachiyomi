@@ -10,7 +10,7 @@ package tachiyomi.ui
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
+import com.afollestad.aesthetic.AestheticActivity
 import com.bluelinelabs.conductor.Conductor
 import com.bluelinelabs.conductor.Router
 import kotlinx.android.synthetic.main.main_activity.*
@@ -21,7 +21,7 @@ import tachiyomi.ui.deeplink.ChapterDeepLinkController
 import tachiyomi.ui.deeplink.MangaDeepLinkController
 import tachiyomi.ui.home.HomeController
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AestheticActivity() {
 
   private var router: Router? = null
 
