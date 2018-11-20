@@ -10,6 +10,7 @@ package tachiyomi.ui
 
 import android.content.Intent
 import android.os.Bundle
+import com.afollestad.aesthetic.Aesthetic
 import com.afollestad.aesthetic.AestheticActivity
 import com.bluelinelabs.conductor.Conductor
 import com.bluelinelabs.conductor.Router
@@ -20,6 +21,7 @@ import tachiyomi.ui.base.withoutTransition
 import tachiyomi.ui.deeplink.ChapterDeepLinkController
 import tachiyomi.ui.deeplink.MangaDeepLinkController
 import tachiyomi.ui.home.HomeController
+import tachiyomi.util.ThemeUtil
 
 class MainActivity : AestheticActivity() {
 
@@ -27,6 +29,11 @@ class MainActivity : AestheticActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+
+    if (Aesthetic.isFirstTime) {
+      ThemeUtil.setDarkTheme()
+      ThemeUtil.setTachiyomiAccent()
+    }
 
     // Do not let the launcher create a new activity http://stackoverflow.com/questions/16283079
     if (!isTaskRoot) {
